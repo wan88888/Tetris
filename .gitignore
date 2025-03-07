@@ -1,0 +1,43 @@
+# LÖVE游戏项目的.gitignore文件
+
+# 操作系统生成的文件
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# 编辑器和IDE生成的文件/目录
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# LÖVE特定的文件
+*.love
+
+# 构建输出和临时文件
+build/
+dist/
+temp/
+tmp/
+
+# 日志文件
+*.log
+logs/
+
+# 可能包含敏感信息的文件
+config.local.lua
+secrets.lua
+
+# 依赖管理（如果使用）
+vendor/
+node_modules/
+
+# 其他常见的不需要提交的文件
+*.bak
+*.tmp
+*.temp
