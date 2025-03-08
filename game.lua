@@ -11,13 +11,13 @@ local ScoreboardConfig = require 'config.scoreboard'
 local GRID_WIDTH = 10      -- 游戏网格宽度
 local GRID_HEIGHT = 20     -- 游戏网格高度
 local CELL_SIZE = 30       -- 单元格大小
-local BOARD_OFFSET_X = 300 -- 游戏板X偏移
-local BOARD_OFFSET_Y = 20  -- 游戏板Y偏移
-local PREVIEW_OFFSET_X = 30 -- 预览区域X偏移
-local PREVIEW_OFFSET_Y = 50 -- 预览区域Y偏移
-local UI_OFFSET_X = 30      -- UI区域X偏移
+local BOARD_OFFSET_X = 400 -- 游戏板X偏移
+local BOARD_OFFSET_Y = 50  -- 游戏板Y偏移
+local PREVIEW_OFFSET_X = 50 -- 预览区域X偏移
+local PREVIEW_OFFSET_Y = 80 -- 预览区域Y偏移
+local UI_OFFSET_X = 50      -- UI区域X偏移
 local UI_OFFSET_Y = 250     -- UI区域Y偏移
-local UI_PANEL_WIDTH = 280   -- UI面板宽度
+local UI_PANEL_WIDTH = 300   -- UI面板宽度
 local UI_TEXT_PADDING = 20   -- UI文字内边距
 
 -- 游戏类
@@ -205,14 +205,13 @@ end
 -- 更新游戏状态
 function Game:update(dt)
     if self.state == "playing" then
-    
-    -- 更新下落计时器
-    self.dropTimer = self.dropTimer + dt
-    if self.dropTimer >= self.dropSpeed then
-        self.dropTimer = 0
-        self:moveTetrominoDown()
+        -- 更新下落计时器
+        self.dropTimer = self.dropTimer + dt
+        if self.dropTimer >= self.dropSpeed then
+            self.dropTimer = 0
+            self:moveTetrominoDown()
+        end
     end
-end
 end
 
 -- 绘制主菜单
@@ -222,15 +221,15 @@ function Game:drawMenu()
     
     -- 使用缓存的字体
     if not self.titleFont then
-        self.titleFont = love.graphics.newFont(FontConfig.DEFAULT_FONT_PATH, 36)
+        self.titleFont = love.graphics.newFont(FontConfig.DEFAULT_FONT_PATH, FontConfig.TITLE_SIZE * 1.5)
     end
     love.graphics.setColor(1, 1, 1)
     love.graphics.setFont(self.titleFont)
-    love.graphics.printf("俄罗斯方块", 0, 100, love.graphics.getWidth(), "center")
+    love.graphics.printf("俄罗斯方块", 0, 120, love.graphics.getWidth(), "center")
     
     -- 恢复默认字体
     if not self.normalFont then
-        self.normalFont = love.graphics.newFont(FontConfig.DEFAULT_FONT_PATH, 20)
+        self.normalFont = love.graphics.newFont(FontConfig.DEFAULT_FONT_PATH, FontConfig.NORMAL_SIZE * 1.25)
     end
     love.graphics.setFont(self.normalFont)
     
@@ -238,8 +237,8 @@ function Game:drawMenu()
     self.menuItems[2] = "难度: " .. DifficultyConfig:getCurrentLevel().name
     
     -- 绘制菜单选项
-    local menuY = 200
-    local menuSpacing = 50
+    local menuY = 180
+    local menuSpacing = 60
     
     for i, item in ipairs(self.menuItems) do
         -- 选中项使用不同颜色
@@ -274,7 +273,7 @@ function Game:drawHighScores()
     
     -- 使用缓存的字体
     if not self.titleFont then
-        self.titleFont = love.graphics.newFont(FontConfig.DEFAULT_FONT_PATH, 36)
+        self.titleFont = love.graphics.newFont(FontConfig.DEFAULT_FONT_PATH, FontConfig.TITLE_SIZE * 1.5)
     end
     love.graphics.setColor(1, 1, 1)
     love.graphics.setFont(self.titleFont)
@@ -282,7 +281,7 @@ function Game:drawHighScores()
     
     -- 恢复默认字体
     if not self.normalFont then
-        self.normalFont = love.graphics.newFont(FontConfig.DEFAULT_FONT_PATH, 20)
+        self.normalFont = love.graphics.newFont(FontConfig.DEFAULT_FONT_PATH, FontConfig.NORMAL_SIZE * 1.25)
     end
     love.graphics.setFont(self.normalFont)
     
@@ -348,19 +347,9 @@ function Game:draw()
         -- 绘制游戏网格
         self:drawGrid()
         
-        -- 绘制硬降落预览
-        local hardDropY = self:calculateHardDropPosition()
-        if hardDropY then
-            local originalY = self.tetrominoY
-            self.tetrominoY = hardDropY
-            love.graphics.setColor(0.5, 0.5, 0.5, 0.3)
-            self:drawTetromino()
-            self.tetrominoY = originalY
-        end
-        
         -- 绘制当前方块
         love.graphics.setColor(1, 1, 1, 1)
-        self:drawTetromino()
+        self:drawTetromino(false) -- 传入false表示绘制实际方块，不是预览
         
         -- 绘制下一个方块预览
         self:drawNextTetromino()
@@ -457,6 +446,8 @@ function Game:keypressed(key)
                 local nextLevel = DifficultyConfig:nextLevel()
             elseif self.selectedMenuItem == 3 then
                 -- 查看排行榜
+                -- 重新加载排行榜数据以确保显示最新记录
+                ScoreboardConfig:load()
                 self.state = "highscores"
             elseif self.selectedMenuItem == 4 then
                 -- 退出游戏
@@ -605,7 +596,7 @@ function _G.initGridLines()
         index = index + 2
     end
     
-    -- 水平线
+    -- 水平线 - 修复：确保绘制完整的水平线，包括底部边框
     for y = 0, GRID_HEIGHT do
         vertices[index] = {BOARD_OFFSET_X, BOARD_OFFSET_Y + y * CELL_SIZE}
         vertices[index + 1] = {BOARD_OFFSET_X + GRID_WIDTH * CELL_SIZE, BOARD_OFFSET_Y + y * CELL_SIZE}
@@ -692,7 +683,7 @@ function Game:calculateHardDropPosition()
 end
 
 -- 绘制当前方块（优化版）
-function Game:drawTetromino()
+function Game:drawTetromino(isPreview)
     if self.state ~= "playing" then
         return
     end
@@ -701,26 +692,27 @@ function Game:drawTetromino()
     local colorType = self.currentTetromino:getType()
     local color = Tetromino.getColorForType(colorType)
     
-    -- 绘制硬降落预览
-    love.graphics.setColor(color[1], color[2], color[3], 0.3) -- 半透明
-    
-    -- 计算硬降落位置（只在需要时计算，避免每帧重复计算）
-    if not self.hardDropY or self.needUpdateHardDrop then
-        self.hardDropY = self:calculateHardDropPosition()
-        self.needUpdateHardDrop = false
-    end
-    
-    -- 绘制硬降落预览
-    for y = 1, 4 do
-        for x = 1, 4 do
-            if shape[y][x] == 1 then
-                local blockX = BOARD_OFFSET_X + (self.tetrominoX + x - 1) * CELL_SIZE
-                local blockY = BOARD_OFFSET_Y + (self.hardDropY + y - 1) * CELL_SIZE
-                
-                love.graphics.rectangle("fill", blockX, blockY, CELL_SIZE, CELL_SIZE)
-                love.graphics.setColor(1, 1, 1, 0.2)
-                love.graphics.rectangle("line", blockX, blockY, CELL_SIZE, CELL_SIZE)
-                love.graphics.setColor(color[1], color[2], color[3], 0.3) -- 恢复半透明颜色
+    -- 如果不是预览模式，绘制硬降落预览
+    if not isPreview then
+        -- 计算硬降落位置（只在需要时计算，避免每帧重复计算）
+        if not self.hardDropY or self.needUpdateHardDrop then
+            self.hardDropY = self:calculateHardDropPosition()
+            self.needUpdateHardDrop = false
+        end
+        
+        -- 绘制硬降落预览
+        love.graphics.setColor(color[1], color[2], color[3], 0.3) -- 半透明
+        for y = 1, 4 do
+            for x = 1, 4 do
+                if shape[y][x] == 1 then
+                    local blockX = BOARD_OFFSET_X + (self.tetrominoX + x - 1) * CELL_SIZE
+                    local blockY = BOARD_OFFSET_Y + (self.hardDropY + y - 1) * CELL_SIZE
+                    
+                    love.graphics.rectangle("fill", blockX, blockY, CELL_SIZE, CELL_SIZE)
+                    love.graphics.setColor(1, 1, 1, 0.2)
+                    love.graphics.rectangle("line", blockX, blockY, CELL_SIZE, CELL_SIZE)
+                    love.graphics.setColor(color[1], color[2], color[3], 0.3) -- 恢复半透明颜色
+                end
             end
         end
     end
@@ -824,9 +816,12 @@ end
 
 -- 绘制UI
 function Game:drawUI()
+    -- 获取字体配置
+    local FontConfig = require 'fonts.config'
+    
     -- 使用缓存的字体
     if not self.uiFont then
-        self.uiFont = love.graphics.newFont(FontConfig.DEFAULT_FONT_PATH, 16)
+        self.uiFont = love.graphics.newFont(FontConfig.DEFAULT_FONT_PATH, FontConfig.NORMAL_SIZE)
     end
     
     -- 绘制UI面板背景
@@ -835,7 +830,7 @@ function Game:drawUI()
         UI_OFFSET_X - 10, 
         UI_OFFSET_Y - 10, 
         UI_PANEL_WIDTH + 20, 
-        350
+        550
     )
     
     -- 绘制UI面板边框
@@ -844,7 +839,7 @@ function Game:drawUI()
         UI_OFFSET_X - 10, 
         UI_OFFSET_Y - 10, 
         UI_PANEL_WIDTH + 20, 
-        350
+        550
     )
     
     -- 绘制游戏信息
@@ -939,7 +934,7 @@ function Game:drawUI()
         love.graphics.printf(
             control,
             UI_OFFSET_X,
-            UI_OFFSET_Y + UI_TEXT_PADDING * (13 + i),
+            UI_OFFSET_Y + UI_TEXT_PADDING * (12.5 + i * 0.9),
             UI_PANEL_WIDTH,
             "left"
         )
@@ -948,43 +943,81 @@ end
 
 -- 键盘按下事件处理
 function Game:keypressed(key)
-    if self.state == "gameover" then
-        if key == "r" then
-            -- 重新开始游戏
-            local newGame = Game.new()
-            for k, v in pairs(newGame) do
-                self[k] = v
+    if key == "escape" then
+        if self.state == "playing" or self.state == "paused" or self.state == "highscores" then
+            self.state = "menu"
+        elseif self.state == "menu" then
+            love.event.quit()
+        end
+        return
+    end
+    
+    if self.state == "menu" then
+        if key == "up" then
+            self.selectedMenuItem = self.selectedMenuItem - 1
+            if self.selectedMenuItem < 1 then
+                self.selectedMenuItem = #self.menuItems
             end
+        elseif key == "down" then
+            self.selectedMenuItem = self.selectedMenuItem + 1
+            if self.selectedMenuItem > #self.menuItems then
+                self.selectedMenuItem = 1
+            end
+        elseif key == "return" then
+            -- 根据选择执行不同操作
+            if self.selectedMenuItem == 1 then
+                -- 开始游戏
+                self:startGame()
+            elseif self.selectedMenuItem == 2 then
+                -- 切换难度
+                local nextLevel = DifficultyConfig:nextLevel()
+            elseif self.selectedMenuItem == 3 then
+                -- 查看排行榜
+                -- 重新加载排行榜数据以确保显示最新记录
+                ScoreboardConfig:load()
+                self.state = "highscores"
+            elseif self.selectedMenuItem == 4 then
+                -- 退出游戏
+                love.event.quit()
+            end
+        elseif key == "space" and self.selectedMenuItem == 2 then
+            -- 在难度选项上按空格切换难度
+            local nextLevel = DifficultyConfig:nextLevel()
         end
-        return
-    end
-    
-    if key == "p" then
-        -- 暂停/继续游戏
-        if self.state == "playing" then
+    elseif self.state == "playing" then
+        if key == "left" then
+            self:moveTetrominoLeft()
+        elseif key == "right" then
+            self:moveTetrominoRight()
+        elseif key == "up" then
+            self:rotateTetromino()
+        elseif key == "down" then
+            self:moveTetrominoDown()
+        elseif key == "space" then
+            -- 硬降落
+            while not self:moveTetrominoDown() do end
+        elseif key == "p" then
             self.state = "paused"
-        else
-            self.state = "playing"
+        elseif key == "m" then
+            self.state = "menu"
+        elseif key == "r" then
+            self:startGame()
         end
-        return
-    end
-    
-    if self.state ~= "playing" then
-        return
-    end
-    
-    if key == "left" then
-        self:moveTetrominoLeft()
-    elseif key == "right" then
-        self:moveTetrominoRight()
-    elseif key == "down" then
-        self:moveTetrominoDown()
-    elseif key == "up" then
-        self:rotateTetromino()
-    elseif key == "space" then
-        -- 硬降（直接下落到底部）
-        while not self:moveTetrominoDown() do
-            -- 继续下落直到不能下落
+    elseif self.state == "paused" then
+        if key == "p" then
+            self.state = "playing"
+        elseif key == "m" then
+            self.state = "menu"
+        end
+    elseif self.state == "gameover" then
+        if key == "return" or key == "r" then
+            self:startGame()
+        elseif key == "m" then
+            self.state = "menu"
+        end
+    elseif self.state == "highscores" then
+        if key == "escape" or key == "backspace" or key == "return" then
+            self.state = "menu"
         end
     end
 end
@@ -1001,12 +1034,6 @@ function Game:moveTetrominoDown()
     if self:checkCollision() then
         self.tetrominoY = self.tetrominoY - 1
         self:lockTetromino()
-        self:clearLines()
-        self:spawnTetromino()
-        
-        if self:isGameOver() then
-            self.state = "gameover"
-        end
         
         -- 更新方块批处理
         self:updateBlockBatches()

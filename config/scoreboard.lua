@@ -25,26 +25,38 @@ local ScoreboardConfig = {
             date = os.date("%Y-%m-%d %H:%M")
         }
         
-        -- 插入新记录
-        table.insert(self.records, newRecord)
-        
-        -- 按分数排序
-        table.sort(self.records, function(a, b)
-            return a.score > b.score
-        end)
-        
-        -- 保留前N条记录
-        while #self.records > self.MAX_RECORDS do
-            table.remove(self.records)
+        -- 检查是否已存在相同的记录，避免重复添加
+        local isDuplicate = false
+        for _, record in ipairs(self.records) do
+            if record.score == score and record.level == level and record.lines == lines then
+                isDuplicate = true
+                break
+            end
         end
         
-        -- 保存记录
-        self:save()
+        -- 只有不是重复记录时才插入
+        if not isDuplicate then
+            -- 插入新记录
+            table.insert(self.records, newRecord)
+            
+            -- 按分数排序
+            table.sort(self.records, function(a, b)
+                return a.score > b.score
+            end)
+            
+            -- 保留前N条记录
+            while #self.records > self.MAX_RECORDS do
+                table.remove(self.records)
+            end
+            
+            -- 保存记录
+            self:save()
         
-        -- 返回新记录在排行榜中的位置
-        for i, record in ipairs(self.records) do
-            if record == newRecord then
-                return i
+            -- 返回新记录在排行榜中的位置
+            for i, record in ipairs(self.records) do
+                if record == newRecord then
+                    return i
+                end
             end
         end
         

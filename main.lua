@@ -46,7 +46,12 @@ end
 -- 键盘按下事件
 function love.keypressed(key)
     if key == "escape" then
-        love.event.quit()
+        -- 如果在排行榜界面，按ESC返回主菜单
+        if game.state == "highscores" then
+            game.state = "menu"
+        else
+            love.event.quit()
+        end
     else
         game:keypressed(key)
     end
